@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Crash Narrative Classification</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar {
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            min-height: 100vh;
+        }
+        .nav-link {
+            color: #ecf0f1 !important;
+            transition: all 0.3s ease;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar p-0">
+                <div class="p-4">
+                    <h4 class="text-white text-center mb-4">
+                        <i class="fas fa-tags"></i> Crash Labeling
+                    </h4>
+                    <nav class="nav flex-column">
+                        <a class="nav-link mb-2" href="/">
+                            <i class="fas fa-dashboard me-2"></i> Dashboard
+                        </a>
+                        <a class="nav-link mb-2" href="/label">
+                            <i class="fas fa-tag me-2"></i> Label Data
+                        </a>
+                        <a class="nav-link mb-2" href="/upload_data">
+                            <i class="fas fa-upload me-2"></i> Upload Data
+                        </a>
+                        <a class="nav-link active mb-2" href="/analytics">
+                            <i class="fas fa-chart-bar me-2"></i> Analytics
+                        </a>
+                        <a class="nav-link mb-2" href="/export_labels">
+                            <i class="fas fa-download me-2"></i> Export Labels
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10">
+                <div class="container-fluid p-4">
+                    <!-- Header -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h1 class="h2 mb-1">Analytics Dashboard</h1>
+                            <p class="text-muted">Analyze the distribution of crash narrative labels</p>
+                        </div>
+                    </div>
+
+                    <!-- Summary Metrics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="card metric-card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                    <h4>{{ severity_distribution|length }}</h4>
+                                    <p class="mb-0">Severity Categories</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card metric-card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-list fa-2x mb-2"></i>
+                                    <h4>{{ category_distribution|length }}</h4>
+                                    <p class="mb-0">Crash Categories</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card metric-card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tags fa-2x mb-2"></i>
+                                    <h4>{{ (severity_distribution|sum(attribute='count')) + (category_distribution|sum(attribute='count')) }}</h4>
+                                    <p class="mb-0">Total Labels</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card metric-card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-pie fa-2x mb-2"></i>
+                                    <h4>100%</h4>
+                                    <p class="mb-0">Coverage</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="row mb-4">
+                        <!-- Severity Distribution Chart -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Crash Severity Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="severityChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category Distribution Chart -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Crash Category Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="categoryChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Tables -->
+                    <div class="row">
+                        <!-- Severity Table -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Severity Breakdown</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if severity_distribution %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Severity Level</th>
+                                                    <th>Count</th>
+                                                    <th>Percentage</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% set total_severity = severity_distribution|sum(attribute='count') %}
+                                                {% for item in severity_distribution %}
+                                                <tr>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.severity_label == 'Minor' %}bg-success
+                                                            {% elif item.severity_label == 'Moderate' %}bg-warning
+                                                            {% elif item.severity_label == 'Major' %}bg-danger
+                                                            {% elif item.severity_label == 'Fatal' %}bg-dark
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ item.severity_label }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ item.count }}</td>
+                                                    <td>{{ "%.1f" | format((item.count / total_severity * 100) if total_severity > 0 else 0) }}%</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No severity data available yet. Start labeling to see analytics.</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category Table -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Category Breakdown</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if category_distribution %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Category</th>
+                                                    <th>Count</th>
+                                                    <th>Percentage</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% set total_category = category_distribution|sum(attribute='count') %}
+                                                {% for item in category_distribution %}
+                                                <tr>
+                                                    <td>
+                                                        <span class="badge bg-primary">{{ item.category_label }}</span>
+                                                    </td>
+                                                    <td>{{ item.count }}</td>
+                                                    <td>{{ "%.1f" | format((item.count / total_category * 100) if total_category > 0 else 0) }}%</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No category data available yet. Start labeling to see analytics.</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export Section -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="fas fa-download me-2"></i>Export Analytics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-3">Export your analytics data for further analysis or reporting:</p>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-outline-primary" onclick="exportChartData()">
+                                            <i class="fas fa-chart-bar me-2"></i>Export Chart Data
+                                        </button>
+                                        <a href="/export_labels" class="btn btn-outline-success">
+                                            <i class="fas fa-database me-2"></i>Export All Labels
+                                        </a>
+                                        <button type="button" class="btn btn-outline-info" onclick="generateReport()">
+                                            <i class="fas fa-file-pdf me-2"></i>Generate Report
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Severity Distribution Chart
+        const severityData = {
+            labels: [{% for item in severity_distribution %}'{{ item.severity_label }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for item in severity_distribution %}{{ item.count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#28a745', // Green for Minor
+                    '#ffc107', // Yellow for Moderate  
+                    '#dc3545', // Red for Major
+                    '#343a40', // Dark for Fatal
+                    '#6c757d'  // Gray for others
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        };
+
+        const severityChart = new Chart(document.getElementById('severityChart'), {
+            type: 'doughnut',
+            data: severityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Category Distribution Chart
+        const categoryData = {
+            labels: [{% for item in category_distribution %}'{{ item.category_label }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Count',
+                data: [{% for item in category_distribution %}{{ item.count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#007bff', '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6f42c1'
+                ],
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        };
+
+        const categoryChart = new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: categoryData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed.y + ' crashes';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+
+        function exportChartData() {
+            const data = {
+                severity_distribution: {{ severity_distribution|tojson }},
+                category_distribution: {{ category_distribution|tojson }}
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'crash_analytics_' + new Date().toISOString().split('T')[0] + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function generateReport() {
+            alert('Report generation feature coming soon! For now, you can export the raw data and create reports in your preferred tool.');
+        }
+    </script>
+</body>
+</html>
